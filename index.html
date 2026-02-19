@@ -7,11 +7,36 @@
 <style>
 body{font-family:sans-serif;background:#111;color:#fff;padding:12px}
 select,input,button{padding:8px;margin:4px 0;width:100%}
-button{background:#00c853;border:none;color:#fff}
-.card{background:#222;padding:8px;margin:6px 0}
-.result{background:#1e1e1e;padding:10px;margin:6px 0;border-left:4px solid #00c853;cursor:pointer}
-.small{font-size:12px;color:#aaa}
+button{background:#00c853;border:none;color:#fff;font-size:16px}
+.card{
+  background:#222;padding:8px;margin:6px 0;
+  border-radius:6px;
+}
+.grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.grid .card{
+  width:48%;
+}
+.result{
+  background:#1e1e1e;padding:10px;margin:6px 0;
+  border-left:4px solid #00c853;cursor:pointer;border-radius:6px;
+}
 .hidden{display:none}
+.core-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.core-item{
+  width:48%;
+  background:#222;
+  padding:6px;
+  border-radius:4px;
+  font-size:14px;
+}
 </style>
 </head>
 <body>
@@ -20,6 +45,9 @@ button{background:#00c853;border:none;color:#fff}
 
 <h3>最優先パワーコア</h3>
 <select id="priority"></select>
+
+<!-- 計算ボタンを上に移動 -->
+<button onclick="calculate()">計算（上位50）</button>
 
 <hr>
 
@@ -35,38 +63,21 @@ button{background:#00c853;border:none;color:#fff}
 <button onclick="addModule()">追加</button>
 
 <h3>登録済み</h3>
-<div id="moduleList"></div>
-<p class="small">最大100個</p>
-
-<button onclick="calculate()">計算（上位50）</button>
+<div id="moduleList" class="grid"></div>
+<p style="font-size:12px;color:#aaa">最大100個</p>
 
 <h3>結果</h3>
 <div id="results"></div>
 
 <script>
-// ★ 並び順を指定どおりにした最新版 linkTypes
+// ★ プルダウン順（学さん指定）
 const linkTypes = [
-  "極・ダメージ増強",
-  "極・適応力",
-  "極・HP変動",
-  "極・HP凝縮",
-  "極・応急処置",
-  "極・絶境守護",
-  "極・HP吸収",
-  "極・幸運会心",
-  "集中・詠唱",
-  "集中・会心",
-  "集中・攻撃速度",
-  "集中・幸運",
-  "特攻ダメージ強化",
-  "精鋭打撃",
-  "筋力強化",
-  "知力強化",
-  "敏捷強化",
-  "特攻回復強化",
-  "マスタリー回復強化",
-  "魔法耐性",
-  "物理耐性"
+  "極・ダメージ増強","極・適応力","極・HP変動","極・HP凝縮",
+  "極・応急処置","極・絶境守護","極・HP吸収","極・幸運会心",
+  "集中・詠唱","集中・会心","集中・攻撃速度","集中・幸運",
+  "特攻ダメージ強化","精鋭打撃","筋力強化","知力強化",
+  "敏捷強化","特攻回復強化","マスタリー回復強化",
+  "魔法耐性","物理耐性"
 ];
 
 let modules = JSON.parse(localStorage.getItem("modules"))||[];
@@ -101,10 +112,12 @@ function render(){
  const list=document.getElementById("moduleList");
  list.innerHTML="";
  modules.forEach((m,i)=>{
-  list.innerHTML+=`<div class="card">
-   ${m.links.map(l=>`${l.name}+${l.value}`).join(" / ")}
-   <button onclick="removeModule(${i})">削除</button>
-  </div>`;
+  list.innerHTML+=`
+   <div class="card">
+     <b>${i+1}:</b><br>
+     ${m.links.map(l=>`${l.name}+${l.value}`).join(" / ")}
+     <br><button onclick="removeModule(${i})">削除</button>
+   </div>`;
  });
 }
 
@@ -155,32 +168,21 @@ function calculate(){
      });
    });
 
-   // ★ 優先コアが20以上必須
+   // ★ 優先コア20以上必須
    if(!totals[priority]||totals[priority]<20) continue;
 
-   // ★ 優先以外のコアは16以上必須
-   let ok=true;
-   for(let key of linkTypes){
-     if(key===priority) continue;
-     if((totals[key]||0) < 16){
-       ok=false;
-       break;
+   // ★ 16以上のコアだけ抽出（条件には使わない）
+   let core16 = {};
+   linkTypes.forEach(k=>{
+     if(k!==priority && (totals[k]||0)>=16){
+       core16[k] = totals[k];
      }
-   }
-   if(!ok) continue;
-
-   // レベル計算
-   let detail = {};
-   for(let key of linkTypes){
-     detail[key] = {
-       sum: totals[key] || 0,
-       lv: getLv(totals[key] || 0)
-     };
-   }
+   });
 
    best.push({
      modules:[a,b,c,d],
-     detail
+     priorityValue:totals[priority],
+     core16
    });
 
  }}}
@@ -194,21 +196,25 @@ function calculate(){
  }
 
  resultsDiv.innerHTML = top.map((r,i)=>{
-   let coreList = linkTypes.map(k =>
-     `${k}: ${r.detail[k].sum}（Lv${r.detail[k].lv}）`
-   ).join("<br>");
+   let coreItems = Object.keys(r.core16).map(k=>
+     `<div class="core-item">${k} ${r.core16[k]}</div>`
+   ).join("");
 
-   let moduleDetail = r.modules.map(idx =>
-     modules[idx].links.map(l=>`${l.name}+${l.value}`).join(" / ")
+   let moduleList = r.modules.map(idx=>
+     `${idx+1}: ${modules[idx].links.map(l=>`${l.name}+${l.value}`).join(" / ")}`
    ).join("<br>---<br>");
 
    return `
    <div class="result" onclick="toggleDetail('d${i}')">
      <b>#${i+1}</b><br>
-     ${coreList}
+     優先：${priority} → ${r.priorityValue}<br><br>
+
+     <b>16以上のコア</b>
+     <div class="core-grid">${coreItems}</div>
+
      <div id="d${i}" class="hidden" style="margin-top:10px;">
        <b>使用モジュール</b><br>
-       ${moduleDetail}
+       ${moduleList}
      </div>
    </div>
    `;
@@ -216,8 +222,7 @@ function calculate(){
 }
 
 function toggleDetail(id){
- const el=document.getElementById(id);
- el.classList.toggle("hidden");
+ document.getElementById(id).classList.toggle("hidden");
 }
 
 render();
