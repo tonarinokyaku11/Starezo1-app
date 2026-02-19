@@ -9,6 +9,37 @@ body{font-family:sans-serif;background:#111;color:#fff;padding:12px}
 select,input,button{padding:8px;margin:4px 0;width:100%}
 button{background:#00c853;border:none;color:#fff;font-size:16px;border-radius:6px}
 
+/* 結果の3列表示 */
+.result-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.result-card{
+  width:31%;
+  background:#1e1e1e;
+  padding:8px;
+  border-radius:6px;
+  border-left:4px solid #00c853;
+  cursor:pointer;
+  font-size:12px; /* A1：少し小さめ */
+}
+.hidden{display:none}
+
+/* 16以上コアの2列表示 */
+.core-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+}
+.core-item{
+  width:48%;
+  background:#222;
+  padding:4px;
+  border-radius:4px;
+  font-size:11px;
+}
+
 /* 登録モジュールの3列表示 */
 .grid{
   display:flex;
@@ -23,7 +54,7 @@ button{background:#00c853;border:none;color:#fff;font-size:16px;border-radius:6p
   font-size:13px;
 }
 
-/* 編集フォームのカード */
+/* 編集フォーム */
 .edit-card{
   background:#333;
   padding:8px;
@@ -31,7 +62,7 @@ button{background:#00c853;border:none;color:#fff;font-size:16px;border-radius:6p
   margin-top:6px;
 }
 
-/* リンク＋値の1セットカード */
+/* リンクセット */
 .link-set{
   background:#222;
   padding:10px;
@@ -47,27 +78,6 @@ button{background:#00c853;border:none;color:#fff;font-size:16px;border-radius:6p
   display:inline-block;
   margin-left:4px;
 }
-
-/* 結果表示 */
-.result{
-  background:#1e1e1e;padding:10px;margin:6px 0;
-  border-left:4px solid #00c853;cursor:pointer;border-radius:6px;
-}
-.hidden{display:none}
-
-/* 16以上コアの2列表示 */
-.core-grid{
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-}
-.core-item{
-  width:48%;
-  background:#222;
-  padding:6px;
-  border-radius:4px;
-  font-size:14px;
-}
 </style>
 </head>
 <body>
@@ -77,7 +87,13 @@ button{background:#00c853;border:none;color:#fff;font-size:16px;border-radius:6p
 <h3>最優先パワーコア</h3>
 <select id="priority"></select>
 
-<button onclick="calculate()">計算（上位50）</button>
+<button onclick="calculate()">計算（全件表示）</button>
+
+<hr>
+
+<!-- ▼ 結果を上に移動 -->
+<h3>結果</h3>
+<div id="results" class="result-grid"></div>
 
 <hr>
 
@@ -94,13 +110,10 @@ button{background:#00c853;border:none;color:#fff;font-size:16px;border-radius:6p
 
 <h3>登録済み</h3>
 <div id="moduleList" class="grid"></div>
-<p style="font-size:12px;color:#aaa">最大100個</p>
-
-<h3>結果</h3>
-<div id="results"></div>
+<p style="font-size:12px;color:#aaa">最大300個</p>
 
 <script>
-// ★ プルダウン順
+// ▼ プルダウン順
 const linkTypes = [
   "極・ダメージ増強","極・適応力","極・HP変動","極・HP凝縮",
   "極・応急処置","極・絶境守護","極・HP吸収","極・幸運会心",
@@ -148,7 +161,6 @@ function render(){
 
  modules.forEach((m,i)=>{
    if(editingIndex === i){
-     // 編集モード
      list.innerHTML += `
        <div class="card">
          <b>${i+1} 編集中</b>
@@ -167,7 +179,6 @@ function render(){
        </div>
      `;
    } else {
-     // 通常表示
      list.innerHTML+=`
        <div class="card">
          <b>${i+1}:</b><br>
@@ -208,7 +219,7 @@ function saveEdit(i){
 }
 
 function addModule(){
- if(modules.length>=100){alert("最大100個");return;}
+ if(modules.length>=300){alert("最大300個");return;}
  const names=document.querySelectorAll(".lname");
  const vals=document.querySelectorAll(".lval");
  let links=[];
@@ -253,7 +264,6 @@ function calculate(){
      }
    });
 
-   // ★ 追加：16以上が1つもなければスキップ
    if (Object.keys(core16).length === 0) continue;
 
    best.push({
@@ -264,14 +274,12 @@ function calculate(){
 
  }}}}
 
- const top=best.slice(0,50);
-
- if(top.length===0){
+ if(best.length===0){
    resultsDiv.innerHTML="該当なし";
    return;
  }
 
- resultsDiv.innerHTML = top.map((r,i)=>{
+ resultsDiv.innerHTML = best.map((r,i)=>{
    let coreItems = Object.keys(r.core16).map(k=>
      `<div class="core-item">${k} ${r.core16[k]}</div>`
    ).join("");
@@ -281,14 +289,13 @@ function calculate(){
    ).join("<br>---<br>");
 
    return `
-   <div class="result" onclick="toggleDetail('d${i}')">
+   <div class="result-card" onclick="toggleDetail('d${i}')">
      <b>#${i+1}</b><br>
-     優先：${priority} → ${r.priorityValue}<br><br>
-
+     優先：${priority} → ${r.priorityValue}<br>
      <b>16以上のコア</b>
      <div class="core-grid">${coreItems}</div>
 
-     <div id="d${i}" class="hidden" style="margin-top:10px;">
+     <div id="d${i}" class="hidden" style="margin-top:6px;">
        <b>使用モジュール</b><br>
        ${moduleList}
      </div>
