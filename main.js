@@ -116,7 +116,7 @@ const jobPresets = {
       "霜天型": [
         "知力強化","特攻ダメージ強化","精鋭打撃","集中・詠唱",
         "極・ダメージ増強","極・適応力","筋力強化","敏捷強化",
-        "特区回復強化","マスタリー回復強化","魔法耐性","物理耐性",
+        "特攻回復強化","マスタリー回復強化","魔法耐性","物理耐性",
         "集中・攻撃速度","集中・会心","集中・幸運"
       ]
     }
@@ -146,18 +146,24 @@ const jobPresets = {
    ============================================================ */
 
 window.onload = () => {
+  initJobSelect();
+  initPrioritySelect();
+  updateLinkInputs();
+};
+
+
+/* ============================================================
+   ▼ 3. 職業 → ビルド変更
+   ============================================================ */
+
+function initJobSelect() {
   const jobSelect = document.getElementById("jobSelect");
   jobSelect.innerHTML = Object.keys(jobPresets)
     .map(j => `<option value="${j}">${j}</option>`)
     .join("");
 
   onJobChange();
-};
-
-
-/* ============================================================
-   ▼ 3. 職業変更 → ビルドタイプ更新
-   ============================================================ */
+}
 
 function onJobChange() {
   const job = document.getElementById("jobSelect").value;
@@ -171,24 +177,76 @@ function onJobChange() {
 
 
 /* ============================================================
-   ▼ 4. ビルド変更 → おすすめコア表示
+   ▼ 4. ビルド変更 → おすすめコアチェックボックス生成
    ============================================================ */
 
 function onBuildChange() {
   const job = document.getElementById("jobSelect").value;
   const build = document.getElementById("buildSelect").value;
 
-  const list = jobPresets[job].builds[build];
+  const recommended = jobPresets[job].builds[build];
 
-  document.getElementById("recommendedList").innerHTML =
-    list.map(x => `・${x}`).join("<br>");
+  const box = document.getElementById("recommendedFilterBox");
+  box.innerHTML = recommended
+    .map(core => `
+      <label style="display:block;">
+        <input type="checkbox" class="recCheck" value="${core}">
+        ${core}
+      </label>
+    `)
+    .join("");
 
   renderResults();
 }
 
 
 /* ============================================================
-   ▼ 5. モジュール登録
+   ▼ 5. 最優先パワーコアの復活
+   ============================================================ */
+
+const powerCoreList = [
+  "筋力強化","敏捷強化","知力強化","特攻ダメージ強化","特攻回復強化",
+  "マスタリー回復強化","集中・攻撃速度","集中・会心","集中・幸運",
+  "集中・詠唱","魔法耐性","物理耐性","精鋭打撃","極・HP凝縮",
+  "極・応急処置","極・幸運会心","極・絶境守護","極・HP吸収",
+  "極・HP変動","極・ダメージ増強","極・適応力"
+];
+
+function initPrioritySelect() {
+  const sel = document.getElementById("priority");
+  sel.innerHTML = powerCoreList.map(x => `<option value="${x}">${x}</option>`).join("");
+}
+
+
+/* ============================================================
+   ▼ 6. モジュール登録画面の復活
+   ============================================================ */
+
+function updateLinkInputs() {
+  const rarity = document.getElementById("rarity").value;
+  const box = document.getElementById("links");
+
+  const count = rarity === "gold" ? 3 : 2;
+
+  box.innerHTML = "";
+
+  for (let i = 1; i <= count; i++) {
+    box.innerHTML += `
+      <div class="link-set">
+        <select id="link${i}type">
+          ${powerCoreList.map(x => `<option value="${x}">${x}</option>`).join("")}
+        </select>
+        <input id="link${i}level" type="number" min="1" max="20" value="1">
+      </div>
+    `;
+  }
+}
+
+document.getElementById("rarity").addEventListener("change", updateLinkInputs);
+
+
+/* ============================================================
+   ▼ 7. モジュール登録
    ============================================================ */
 
 let modules = [];
@@ -201,9 +259,10 @@ function addModule() {
   }
 
   const rarity = document.getElementById("rarity").value;
-  const links = [];
+  const count = rarity === "gold" ? 3 : 2;
 
-  for (let i = 1; i <= (rarity === "gold" ? 3 : 2); i++) {
+  const links = [];
+  for (let i = 1; i <= count; i++) {
     const type = document.getElementById(`link${i}type`).value;
     const level = Number(document.getElementById(`link${i}level`).value);
     links.push({ type, level });
@@ -212,11 +271,6 @@ function addModule() {
   modules.push({ id: moduleId++, rarity, links });
   renderModules();
 }
-
-
-/* ============================================================
-   ▼ 6. モジュール表示
-   ============================================================ */
 
 function renderModules() {
   const box = document.getElementById("moduleList");
@@ -229,10 +283,8 @@ function renderModules() {
     `)
     .join("");
 }
-
-
 /* ============================================================
-   ▼ 7. 計算ロジック
+   ▼ 8. 計算ロジック（3つのモジュール組み合わせ）
    ============================================================ */
 
 let results = [];
@@ -240,19 +292,23 @@ let results = [];
 function calculate() {
   results = [];
 
-  const priority = document.getElementById("priority").value;
+  if (modules.length < 3) {
+    alert("3つ以上登録してください");
+    return;
+  }
+
   const job = document.getElementById("jobSelect").value;
   const build = document.getElementById("buildSelect").value;
   const recommended = jobPresets[job].builds[build];
 
-  // 全組み合わせ
+  // 3つの組み合わせ
   for (let i = 0; i < modules.length; i++) {
     for (let j = i + 1; j < modules.length; j++) {
       for (let k = j + 1; k < modules.length; k++) {
 
         const arr = [modules[i], modules[j], modules[k]];
 
-        // 16以上のコア集計
+        // ▼ 16以上のコア集計
         const map = {};
         arr.forEach(m => {
           m.links.forEach(l => {
@@ -266,13 +322,10 @@ function calculate() {
 
         if (core16.length === 0) continue;
 
-        const recommendedCount = core16.filter(x => recommended.includes(x.type)).length;
-
         results.push({
           modules: arr,
           core16,
-          coreCount: core16.length,
-          recommendedCount
+          coreCount: core16.length
         });
       }
     }
@@ -283,40 +336,54 @@ function calculate() {
 
 
 /* ============================================================
-   ▼ 8. 結果表示（フィルタ＋ソート＋色分け）
+   ▼ 9. AND 条件フィルタ（チェックされたおすすめコアを全部含む）
+   ============================================================ */
+
+function getCheckedRecommended() {
+  return [...document.querySelectorAll(".recCheck")]
+    .filter(c => c.checked)
+    .map(c => c.value);
+}
+
+
+/* ============================================================
+   ▼ 10. 並び替え（coreCount → 名前順）
+   ============================================================ */
+
+function sortResults(arr) {
+  return arr.sort((a, b) => {
+    // ① coreCount（16以上のコア数）降順
+    if (b.coreCount !== a.coreCount) {
+      return b.coreCount - a.coreCount;
+    }
+
+    // ② 同数なら種類名で昇順
+    const aNames = a.core16.map(x => x.type).sort().join("");
+    const bNames = b.core16.map(x => x.type).sort().join("");
+    return aNames.localeCompare(bNames, "ja");
+  });
+}
+
+
+/* ============================================================
+   ▼ 11. 結果表示（色分け・3列）
    ============================================================ */
 
 function renderResults() {
   const box = document.getElementById("results");
-  const filter = document.getElementById("recommendedFilter").value;
-  const sortType = document.getElementById("sortType").value;
-
-  const job = document.getElementById("jobSelect").value;
-  const build = document.getElementById("buildSelect").value;
-  const recommended = jobPresets[job].builds[build];
+  const checked = getCheckedRecommended();
 
   let arr = results.slice();
 
-  // ▼ フィルタ
-  arr = arr.filter(r => {
-    if (filter === "1") return r.recommendedCount >= 1;
-    if (filter === "2") return r.recommendedCount >= 2;
-    if (filter === "all") return r.recommendedCount >= recommended.length;
-    return true;
-  });
-
-  // ▼ ソート
-  if (sortType === "recommended") {
-    arr.sort((a, b) => b.recommendedCount - a.recommendedCount);
-  } else if (sortType === "count") {
-    arr.sort((a, b) => b.coreCount - a.coreCount);
-  } else {
-    arr.sort((a, b) => {
-      const an = a.core16.map(x => x.type).join("");
-      const bn = b.core16.map(x => x.type).join("");
-      return an.localeCompare(bn, "ja");
-    });
+  // ▼ AND 条件フィルタ
+  if (checked.length > 0) {
+    arr = arr.filter(r =>
+      checked.every(c => r.core16.some(x => x.type === c))
+    );
   }
+
+  // ▼ 並び替え
+  arr = sortResults(arr);
 
   // ▼ 表示
   box.innerHTML = arr
@@ -330,12 +397,10 @@ function renderResults() {
         <div class="result-card ${colorClass}">
           <b>16以上のコア：${r.coreCount}個</b><br>
           <div class="core-grid">
-            ${r.core16.map(c => `
-              <div class="core-item">${c.type} Lv${c.level}</div>
-            `).join("")}
+            ${r.core16
+              .map(c => `<div class="core-item">${c.type} Lv${c.level}</div>`)
+              .join("")}
           </div>
-          <hr>
-          <b>おすすめ一致：${r.recommendedCount}個</b>
         </div>
       `;
     })
